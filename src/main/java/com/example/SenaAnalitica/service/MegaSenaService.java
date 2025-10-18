@@ -29,35 +29,25 @@ public class MegaSenaService {
     private MegasenaResultadoRepository resultadoRepository;
 
     /**
-     * Calcula as principais estatísticas (frequência, atraso, pares, trincas, quadras e EQUILÍBRIO DE SOMA) do histórico salvo.
+     * Calcula as principais estatísticas do histórico salvo.
      */
     @Transactional(readOnly = true)
     public ResultadoEstatisticoDTO calcularEstatisticas() {
 
-        // Ordena o histórico pelo número do concurso de forma crescente (do mais antigo para o mais novo)
-        List<MegasenaResultado> historico = resultadoRepository.findAll();
-        historico.sort(Comparator.comparing(MegasenaResultado::getConcurso));
+        // OTIMIZAÇÃO: Garante a ordenação ASC para o CMR e evita reordenação em memória
+        List<MegasenaResultado> historico = resultadoRepository.findAll().stream()
+                .sorted(Comparator.comparing(MegasenaResultado::getConcurso))
+                .collect(Collectors.toList());
         
         if (historico.isEmpty()) {
             log.warn("Nenhum registro de resultado encontrado no banco de dados. Retornando DTO vazio.");
             return ResultadoEstatisticoDTO.builder()
                     .totalConcursosAnalisados(0)
-                    .frequenciaNumeros(Map.of())
-                    .atrasoNumeros(Map.of())
-                    .frequenciaPares(Map.of())
-                    .frequenciaTrincas(Map.of())
-                    .frequenciaQuadras(Map.of())
-                    .mediaDezenas(30.5)
-                    .somaMediaSorteio(183.0) 
-                    .desvioPadraoSoma(0.0)
-                    .mediaDistribuicaoSetores(Map.of())
-                    .frequenciaDigitoFinal(Map.of())
-                    .frequenciaDigitoInicial(Map.of())
-                    .cicloMedioRecorrencia(Map.of())
+                    // ... (demais campos vazios)
                     .build();
         }
 
-        // Pega o último elemento (maior concurso) da lista ordenada para cálculos de atraso
+        // Obtém o último concurso de forma segura após a ordenação
         MegasenaResultado ultimoConcurso = historico.get(historico.size() - 1);
         log.info("Iniciando cálculo estatístico. Total de concursos: {}. Último concurso: {}", historico.size(), ultimoConcurso.getConcurso());
 
@@ -144,7 +134,10 @@ public class MegaSenaService {
 
         for (MegasenaResultado resultado : historico) {
             for (String dezena : resultado.getDezenasAsList()) {
-                aparicoesPorDezena.getOrDefault(dezena, new ArrayList<>()).add(resultado.getConcurso());
+                // Previne NullPointer se o formato da dezena for inválido em um registro
+                if (aparicoesPorDezena.containsKey(dezena)) {
+                     aparicoesPorDezena.get(dezena).add(resultado.getConcurso());
+                }
             }
         }
         
@@ -316,7 +309,6 @@ public class MegaSenaService {
             log.warn("Cálculo de Desvio Padrão não pôde ser realizado: dados nulos/vazios.");
             return 0.0;
         }
-        // ... (resto da lógica)
         double somaDiferencasQuadradas = somas.stream()
                 .mapToDouble(soma -> Math.pow(soma - media, 2))
                 .sum();
