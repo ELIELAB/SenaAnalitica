@@ -35,4 +35,7 @@ public class ResultadoEstatisticoDTO {
 
     // NOVO: Desvio Padrão da soma de todas as 6 dezenas
     private Double desvioPadraoSoma;
+
+    // NOVO (3): Média de números por quadrante (01-15, 16-30, etc.)
+    private Map<String, Double> mediaDistribuicaoSetores;
 }
