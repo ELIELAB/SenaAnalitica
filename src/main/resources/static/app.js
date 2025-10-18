@@ -91,19 +91,35 @@ function gerarApostaInteligente(data) {
     renderAposta(apostaMista, 'aposta-mista', 'estrategia-mista', limiteInferior, limiteSuperior, 'bg-primary');
 }
 
-// --- LÓGICA GERAL (Função que respeita regras de equilíbrio) ---
+// --- LÓGICA GERAL (Função que respeita regras de equilíbrio E SEQUÊNCIA) ---
 function criarAposta(numsPrioridade, pares, logBase, motivoFrio, motivoQuente, maxSetor = 2, maxInicial = 2) {
     let aposta = [];
     let log = [...logBase];
+    const maxSetorFinal = maxSetor; 
+    const maxInicialFinal = maxInicial; 
     
-    // Helper para checar equilíbrio
-    function isEquilibrado(dezena) {
+    // Helper para checar equilíbrio e **NOVO: ANTI-SEQUÊNCIA**
+    function isEquilibrado(dezena, checkSequence = true) {
+        const num = parseInt(dezena);
         const setor = getSetor(dezena);
         const inicial = getDigitoInicial(dezena);
+        
         const countSetor = aposta.filter(d => getSetor(d) === setor).length;
         const countInicial = aposta.filter(d => getDigitoInicial(d) === inicial).length;
         
-        return countSetor < maxSetor && countInicial < maxInicial;
+        // 1. Regra de Sequência: Verifica se o número é adjacente a um número já escolhido
+        if (checkSequence) {
+            const isSequencia = aposta.some(d => {
+                const outro = parseInt(d);
+                return outro === num + 1 || outro === num - 1;
+            });
+            if (isSequencia) {
+                return false;
+            }
+        }
+
+        // 2. Regra de Distribuição
+        return countSetor < maxSetorFinal && countInicial < maxInicialFinal;
     }
 
     // 1. Adicionar números da Prioridade (CMR/Frequência)
@@ -128,11 +144,12 @@ function criarAposta(numsPrioridade, pares, logBase, motivoFrio, motivoQuente, m
         } 
         // Tentar incluir o fechamento de par
         else if (aposta.length === 5) {
-             if (aposta.includes(d1) && !aposta.includes(d2) && isEquilibrado(d2)) {
+             // Passamos 'false' para checkSequence para permitir que o fechamento do par crie sequência, se for o caso
+             if (aposta.includes(d1) && !aposta.includes(d2) && isEquilibrado(d2, false)) { 
                  aposta.push(d2);
                  log.push(`- ${d2}: FECHAMENTO DE PAR (${parStr})`);
                  break;
-             } else if (aposta.includes(d2) && !aposta.includes(d1) && isEquilibrado(d1)) {
+             } else if (aposta.includes(d2) && !aposta.includes(d1) && isEquilibrado(d1, false)) {
                  aposta.push(d1);
                  log.push(`- ${d1}: FECHAMENTO DE PAR (${parStr})`);
                  break;
@@ -148,22 +165,33 @@ function criarAposta(numsPrioridade, pares, logBase, motivoFrio, motivoQuente, m
 
         let numeroEscolhido = null;
 
-        // Tenta achar o melhor número para o equilíbrio
+        // Tenta achar o melhor número para o equilíbrio (que não cria sequência)
         for (const { dezena } of friosRestantes) {
+            // A regra isEquilibrado já verifica a sequência
             if (isEquilibrado(dezena)) {
                 numeroEscolhido = dezena;
                 break; 
             }
         }
         
-        // Se não encontrou o 'melhor' equilibrado, pega o próximo mais crítico/prioritário
-        if (!numeroEscolhido && friosRestantes.length > 0) {
-             numeroEscolhido = friosRestantes[0].dezena;
-        }
+        // Se não encontrou o 'melhor' equilibrado (porque a sequência e distribuição bloquearam), 
+        // relaxamos a regra do isSequencia APENAS se for o último slot.
+        if (!numeroEscolhido && aposta.length === 5 && friosRestantes.length > 0) {
+             // Pega o número mais crítico restante e verifica apenas as regras de distribuição
+             const proximoFrio = friosRestantes.find(n => isEquilibrado(n.dezena, false));
 
+             if (proximoFrio) {
+                 numeroEscolhido = proximoFrio.dezena;
+                 log.push(`- ${numeroEscolhido}: PREENCHIMENTO FINAL (Regra de Sequência RELAXADA)`);
+             }
+        }
+        
         if (numeroEscolhido) {
+            // Evita duplicar log se já foi adicionado
+            if (!log.some(l => l.includes(numeroEscolhido))) { 
+                 log.push(`- ${numeroEscolhido}: PREENCHIMENTO DE EQUILÍBRIO`);
+            }
             aposta.push(numeroEscolhido);
-            log.push(`- ${numeroEscolhido}: PREENCHIMENTO DE EQUILÍBRIO`);
         } else {
              break; 
         }
