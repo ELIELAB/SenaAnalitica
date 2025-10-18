@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap; // Adicionado para manter a ordem do sort
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -28,7 +28,7 @@ public class MegaSenaService {
     private MegasenaResultadoRepository resultadoRepository;
 
     /**
-     * Calcula as principais estatísticas (frequência, atraso, pares, trincas e quadras) do histórico salvo.
+     * Calcula as principais estatísticas (frequência, atraso, pares, trincas, quadras e EQUILÍBRIO DE SOMA) do histórico salvo.
      */
     @Transactional(readOnly = true)
     public ResultadoEstatisticoDTO calcularEstatisticas() {
@@ -44,6 +44,8 @@ public class MegaSenaService {
                     .frequenciaTrincas(Map.of())
                     .frequenciaQuadras(Map.of())
                     .mediaDezenas(30.5)
+                    .somaMediaSorteio(183.0) 
+                    .desvioPadraoSoma(0.0)
                     .build();
         }
 
@@ -57,7 +59,28 @@ public class MegaSenaService {
                  ultimoConcurso.getDezenasSorteadas(), 
                  ultimoConcurso.getDezenasAsList());
         
-        // 1. Contagem de Frequência (A.1)
+        // --- 1. CÁLCULO DAS SOMAS E DP (NOVO) ---
+        List<Double> somasPorSorteio = historico.stream()
+                .map(c -> c.getDezenasAsList().stream()
+                        .mapToInt(s -> {
+                            try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return 0; }
+                        })
+                        .sum())
+                .map(Integer::doubleValue)
+                .collect(Collectors.toList());
+        
+        double somaTotal = somasPorSorteio.stream().mapToDouble(Double::doubleValue).sum();
+        int totalSorteios = somasPorSorteio.size();
+        
+        // Média da Soma: (soma de todas as somas) / (total de sorteios)
+        Double somaMedia = totalSorteios > 0 ? somaTotal / totalSorteios : 183.0;
+        
+        // Desvio Padrão da Soma
+        Double desvioPadrao = calcularDesvioPadraoSoma(somasPorSorteio, somaMedia);
+        
+        // --- 2. CÁLCULO DAS ESTATÍSTICAS DE FREQUÊNCIA ---
+        
+        // Frequência Simples (A.1)
         Map<String, Long> frequencia = historico.stream()
                 .flatMap(c -> c.getDezenasAsList().stream())
                 .collect(Collectors.groupingBy(
@@ -65,56 +88,57 @@ public class MegaSenaService {
                         Collectors.counting()
                 ));
 
-        // 2. Análise de Atraso (A.2)
+        // Atraso (A.2)
         Map<String, Integer> atraso = calcularAtraso(historico, ultimoConcurso.getConcurso());
         
-        // 3. Análise de Pares (A.3)
+        // Pares (A.3)
         Map<String, Long> frequenciaPares = calcularFrequenciaPares(historico);
         
-        // 4. Análise de Trincas (NOVO)
+        // Trincas e Quadras (C.1 e C.2) - Filtrado para Top 100
         Map<String, Long> rawFrequenciaTrincas = calcularFrequenciaTrincas(historico);
         Map<String, Long> topTrincas = filtrarTopN(rawFrequenciaTrincas, 100);
         
-        // 5. Análise de Quadras (NOVO)
         Map<String, Long> rawFrequenciaQuadras = calcularFrequenciaQuadras(historico);
         Map<String, Long> topQuadras = filtrarTopN(rawFrequenciaQuadras, 100);
 
-        // 6. Monta e Retorna o DTO
+        // --- 3. MONTA E RETORNA O DTO ---
         return ResultadoEstatisticoDTO.builder()
                 .totalConcursosAnalisados(historico.size())
                 .ultimoSorteio(ultimoSorteioDate) 
                 .frequenciaNumeros(frequencia)
                 .atrasoNumeros(atraso)
                 .frequenciaPares(frequenciaPares)
-                .frequenciaTrincas(topTrincas) // Agora filtrado
-                .frequenciaQuadras(topQuadras) // Agora filtrado
-                .mediaDezenas(30.5) 
+                .frequenciaTrincas(topTrincas) 
+                .frequenciaQuadras(topQuadras) 
+                .mediaDezenas(30.5) // Média Aritmética Teórica (constante)
+                .somaMediaSorteio(somaMedia) // NOVO
+                .desvioPadraoSoma(desvioPadrao) // NOVO
                 .build();
     }
     
-    /**
-     * Filtra o mapa para retornar apenas os top N elementos, ordenados por frequência (valor) decrescente.
-     * @param map Mapa completo de frequência.
-     * @param limit O número máximo de elementos a retornar.
-     * @return Um novo mapa LinkedHashMap com os resultados ordenados e limitados.
-     */
-    private Map<String, Long> filtrarTopN(Map<String, Long> map, int limit) {
-        return map.entrySet().stream()
-                // 1. Ordena pela frequência (valor) decrescente
-                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                // 2. Limita aos N primeiros
-                .limit(limit)
-                // 3. Coleta para um LinkedHashMap para manter a ordem
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (e1, e2) -> e1, // Função de merge, não deve ser chamada aqui
-                        LinkedHashMap::new
-                ));
-    }
+    // --- NOVO MÉTODO AUXILIAR PARA DESVIO PADRÃO ---
     
-    // --- Lógica Auxiliar de Cálculo de Atraso (A.2) ---
+    /**
+     * Calcula o Desvio Padrão de uma lista de somas.
+     * @param somas Lista das somas de todas as dezenas por sorteio.
+     * @param media Média aritmética dessas somas.
+     * @return O Desvio Padrão da Soma.
+     */
+    private Double calcularDesvioPadraoSoma(List<Double> somas, Double media) {
+        if (somas == null || somas.isEmpty() || media == null) {
+            return 0.0;
+        }
 
+        double somaDiferencasQuadradas = somas.stream()
+                .mapToDouble(soma -> Math.pow(soma - media, 2))
+                .sum();
+
+        // Fórmula do Desvio Padrão Populacional
+        return Math.sqrt(somaDiferencasQuadradas / somas.size());
+    }
+
+    // --- Métodos Auxiliares de Lógica Existente ---
+    
     private Map<String, Integer> calcularAtraso(List<MegasenaResultado> historico, Integer ultimoNumConcurso) {
         Map<String, Integer> atraso = new HashMap<>();
         
@@ -138,8 +162,6 @@ public class MegaSenaService {
         return atraso;
     }
 
-    // --- Lógica Auxiliar de Cálculo de Frequência de Pares (A.3) ---
-
     private Map<String, Long> calcularFrequenciaPares(List<MegasenaResultado> historico) {
         Map<String, Long> frequenciaPares = new HashMap<>();
 
@@ -149,7 +171,6 @@ public class MegaSenaService {
                     .sorted()
                     .collect(Collectors.toList());
 
-            // Gera todos os pares (combinação de 2)
             for (int i = 0; i < dezenas.size(); i++) {
                 for (int j = i + 1; j < dezenas.size(); j++) {
                     String par = formatarDezena(dezenas.get(i)) + "-" + formatarDezena(dezenas.get(j));
@@ -160,8 +181,6 @@ public class MegaSenaService {
         return frequenciaPares;
     }
 
-    // --- Lógica Auxiliar de Cálculo de Frequência de Trincas (Novo) ---
-
     private Map<String, Long> calcularFrequenciaTrincas(List<MegasenaResultado> historico) {
         Map<String, Long> frequenciaTrincas = new HashMap<>();
 
@@ -171,7 +190,6 @@ public class MegaSenaService {
                     .sorted()
                     .collect(Collectors.toList());
 
-            // Combinação de 3: C(6, 3) = 20
             for (int i = 0; i < 4; i++) { 
                 for (int j = i + 1; j < 5; j++) {
                     for (int k = j + 1; k < 6; k++) {
@@ -186,8 +204,6 @@ public class MegaSenaService {
         return frequenciaTrincas;
     }
     
-    // --- Lógica Auxiliar de Cálculo de Frequência de Quadras (Novo) ---
-
     private Map<String, Long> calcularFrequenciaQuadras(List<MegasenaResultado> historico) {
         Map<String, Long> frequenciaQuadras = new HashMap<>();
 
@@ -197,7 +213,6 @@ public class MegaSenaService {
                     .sorted()
                     .collect(Collectors.toList());
 
-            // Combinação de 4: C(6, 4) = 15
             for (int i = 0; i < 3; i++) {
                 for (int j = i + 1; j < 4; j++) {
                     for (int k = j + 1; k < 5; k++) {
@@ -215,9 +230,18 @@ public class MegaSenaService {
         return frequenciaQuadras;
     }
     
-    /**
-     * Formata um número inteiro em uma string de dois dígitos (ex: 5 -> "05").
-     */
+    private Map<String, Long> filtrarTopN(Map<String, Long> map, int limit) {
+        return map.entrySet().stream()
+                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
+                .limit(limit)
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        Map.Entry::getValue,
+                        (e1, e2) -> e1, 
+                        LinkedHashMap::new
+                ));
+    }
+    
     private String formatarDezena(Integer dezena) {
         return String.format("%02d", dezena);
     }

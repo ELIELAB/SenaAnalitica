@@ -29,4 +29,10 @@ public class ResultadoEstatisticoDTO {
     
     // C.2 Frequência de Quadras (NOVO)
     private Map<String, Long> frequenciaQuadras; // Key ex: "05-10-15-20"
+
+    // NOVO: Média real da soma de todas as 6 dezenas
+    private Double somaMediaSorteio; 
+
+    // NOVO: Desvio Padrão da soma de todas as 6 dezenas
+    private Double desvioPadraoSoma;
 }
