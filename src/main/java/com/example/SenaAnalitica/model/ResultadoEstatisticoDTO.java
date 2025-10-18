@@ -1,0 +1,26 @@
+package com.example.SenaAnalitica.model;
+
+import lombok.Builder;
+import lombok.Data;
+import java.time.LocalDate;
+import java.util.Map;
+
+@Data
+@Builder
+public class ResultadoEstatisticoDTO {
+
+    private Integer totalConcursosAnalisados;
+    private LocalDate ultimoSorteio;
+
+    // A.1 Frequência de cada dezena (Ex: "05": 300)
+    private Map<String, Long> frequenciaNumeros;
+    
+    // A.2 Atraso de cada dezena (Ex: "05": 5)
+    private Map<String, Integer> atrasoNumeros;
+    
+    // A.3 Frequência de pares (Ex: "05-10": 15)
+    private Map<String, Long> frequenciaPares;
+    
+    // B. Média Aritmética Teórica
+    private Double mediaDezenas; 
+}

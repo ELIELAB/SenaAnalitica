@@ -1,0 +1,13 @@
+# Exclui a pasta de binários e dependências
+/target/
+/bin/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+# Exclui arquivos de log e temporários
+*.log
+*.tmp
+# Exclui arquivos do Spring Boot Devtools
+/src/main/resources/.rebel.xml
+/src/main/resources/.spring-boot-devtools.properties
