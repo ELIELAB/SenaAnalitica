@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -33,9 +34,12 @@ public class MegaSenaService {
     @Transactional(readOnly = true)
     public ResultadoEstatisticoDTO calcularEstatisticas() {
 
+        // Ordena o histórico pelo número do concurso de forma crescente (do mais antigo para o mais novo)
         List<MegasenaResultado> historico = resultadoRepository.findAll();
-
+        historico.sort(Comparator.comparing(MegasenaResultado::getConcurso));
+        
         if (historico.isEmpty()) {
+            log.warn("Nenhum registro de resultado encontrado no banco de dados. Retornando DTO vazio.");
             return ResultadoEstatisticoDTO.builder()
                     .totalConcursosAnalisados(0)
                     .frequenciaNumeros(Map.of())
@@ -49,24 +53,24 @@ public class MegaSenaService {
                     .mediaDistribuicaoSetores(Map.of())
                     .frequenciaDigitoFinal(Map.of())
                     .frequenciaDigitoInicial(Map.of())
+                    .cicloMedioRecorrencia(Map.of())
                     .build();
         }
 
-        historico.sort(Comparator.comparing(MegasenaResultado::getConcurso).reversed());
-        MegasenaResultado ultimoConcurso = historico.get(0);
+        // Pega o último elemento (maior concurso) da lista ordenada para cálculos de atraso
+        MegasenaResultado ultimoConcurso = historico.get(historico.size() - 1);
+        log.info("Iniciando cálculo estatístico. Total de concursos: {}. Último concurso: {}", historico.size(), ultimoConcurso.getConcurso());
 
         LocalDate ultimoSorteioDate = ultimoConcurso.getDataSorteioAsDate().orElse(null);
-
-        log.info("DEBUG: Dezenas salvas para o concurso {}: [{}], lista gerada: {}", 
-                 ultimoConcurso.getConcurso(), 
-                 ultimoConcurso.getDezenasSorteadas(), 
-                 ultimoConcurso.getDezenasAsList());
 
         // --- 1. CÁLCULO DAS SOMAS E DP ---
         List<Double> somasPorSorteio = historico.stream()
                 .map(c -> c.getDezenasAsList().stream()
                         .mapToInt(s -> {
-                            try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) { return 0; }
+                            try { return Integer.parseInt(s.trim()); } catch (NumberFormatException e) {
+                                log.error("Erro de formatação de número em concurso {}: {}", c.getConcurso(), s);
+                                return 0; 
+                            }
                         })
                         .sum())
                 .map(Integer::doubleValue)
@@ -75,10 +79,7 @@ public class MegaSenaService {
         double somaTotal = somasPorSorteio.stream().mapToDouble(Double::doubleValue).sum();
         int totalSorteios = somasPorSorteio.size();
 
-        // Média da Soma
         Double somaMedia = totalSorteios > 0 ? somaTotal / totalSorteios : 183.0;
-
-        // Desvio Padrão da Soma
         Double desvioPadrao = calcularDesvioPadraoSoma(somasPorSorteio, somaMedia);
 
         // --- 2. CÁLCULO DAS ESTATÍSTICAS DE FREQUÊNCIA ---
@@ -98,42 +99,95 @@ public class MegaSenaService {
         Map<String, Long> frequenciaPares = calcularFrequenciaPares(historico);
 
         // Trincas e Quadras
-        Map<String, Long> rawFrequenciaTrincas = calcularFrequenciaTrincas(historico);
-        Map<String, Long> topTrincas = filtrarTopN(rawFrequenciaTrincas, 100);
-
-        Map<String, Long> rawFrequenciaQuadras = calcularFrequenciaQuadras(historico);
-        Map<String, Long> topQuadras = filtrarTopN(rawFrequenciaQuadras, 100);
+        Map<String, Long> frequenciaTrincas = calcularFrequenciaTrincas(historico);
+        Map<String, Long> frequenciaQuadras = calcularFrequenciaQuadras(historico);
 
         // --- 3. CÁLCULO DA DISTRIBUIÇÃO DE SETORES ---
         Map<String, Double> mediaDistribuicaoSetores = calcularMediaDistribuicaoSetores(historico);
         
-        // --- 4. CÁLCULO DE FIM E INÍCIO (NOVO) ---
+        // --- 4. CÁLCULO DE FIM E INÍCIO ---
         Map<String, Long> frequenciaDigitoFinal = calcularFrequenciaDigitoFinal(historico);
         Map<String, Long> frequenciaDigitoInicial = calcularFrequenciaDigitoInicial(historico);
+        
+        // --- 5. CICLO MÉDIO DE RECORRÊNCIA ---
+        Map<String, Double> cicloMedioRecorrencia = calcularCicloMedioRecorrencia(historico);
 
-        // --- 5. MONTA E RETORNA O DTO ---
+
+        // --- 6. MONTA E RETORNA O DTO ---
+        log.info("Cálculos concluídos. Retornando DTO estatístico.");
         return ResultadoEstatisticoDTO.builder()
                 .totalConcursosAnalisados(historico.size())
                 .ultimoSorteio(ultimoSorteioDate) 
                 .frequenciaNumeros(frequencia)
                 .atrasoNumeros(atraso)
                 .frequenciaPares(frequenciaPares)
-                .frequenciaTrincas(topTrincas) 
-                .frequenciaQuadras(topQuadras) 
-                .mediaDezenas(30.5) // Média Aritmética Teórica (constante)
+                .frequenciaTrincas(frequenciaTrincas) 
+                .frequenciaQuadras(frequenciaQuadras) 
+                .mediaDezenas(30.5) 
                 .somaMediaSorteio(somaMedia) 
                 .desvioPadraoSoma(desvioPadrao) 
                 .mediaDistribuicaoSetores(mediaDistribuicaoSetores)
                 .frequenciaDigitoFinal(frequenciaDigitoFinal) 
                 .frequenciaDigitoInicial(frequenciaDigitoInicial) 
+                .cicloMedioRecorrencia(cicloMedioRecorrencia) 
                 .build();
+    }
+    
+    // --- MÉTODOS AUXILIARES PARA CICLO MÉDIO DE RECORRÊNCIA (5) ---
+
+    private Map<String, Double> calcularCicloMedioRecorrencia(List<MegasenaResultado> historico) {
+        
+        Map<String, List<Integer>> aparicoesPorDezena = new HashMap<>();
+        IntStream.rangeClosed(1, 60).forEach(i -> {
+            aparicoesPorDezena.put(formatarDezena(i), new ArrayList<>());
+        });
+
+        for (MegasenaResultado resultado : historico) {
+            for (String dezena : resultado.getDezenasAsList()) {
+                aparicoesPorDezena.getOrDefault(dezena, new ArrayList<>()).add(resultado.getConcurso());
+            }
+        }
+        
+        Map<String, Double> cmrMap = new LinkedHashMap<>();
+
+        for (Map.Entry<String, List<Integer>> entry : aparicoesPorDezena.entrySet()) {
+            String dezena = entry.getKey();
+            List<Integer> concursos = entry.getValue();
+            
+            if (concursos.isEmpty()) {
+                log.warn("Dezena {} nunca foi sorteada em {} concursos!", dezena, historico.size());
+            }
+
+            if (concursos.size() < 2) {
+                double cmr = (double) historico.size();
+                cmrMap.put(dezena, Math.round(cmr * 100.0) / 100.0);
+                continue;
+            }
+            
+            List<Integer> diferencas = new ArrayList<>();
+            for (int i = 1; i < concursos.size(); i++) {
+                int diferenca = concursos.get(i) - concursos.get(i - 1);
+                diferencas.add(diferenca);
+            }
+            
+            double somaDiferencas = diferencas.stream().mapToInt(Integer::intValue).sum();
+            double cmr = somaDiferencas / diferencas.size();
+            
+            cmrMap.put(dezena, Math.round(cmr * 100.0) / 100.0);
+        }
+        
+        return cmrMap.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey, 
+                        Map.Entry::getValue, 
+                        (e1, e2) -> e1, 
+                        LinkedHashMap::new
+                ));
     }
     
     // --- MÉTODOS AUXILIARES PARA ANÁLISE DE FIM E INÍCIO (4) ---
 
-    /**
-     * Calcula a frequência de cada dígito final (0 a 9) em todo o histórico.
-     */
     private Map<String, Long> calcularFrequenciaDigitoFinal(List<MegasenaResultado> historico) {
         
         Map<String, Long> frequencia = historico.stream()
@@ -159,9 +213,6 @@ public class MegaSenaService {
                 ));
     }
 
-    /**
-     * Calcula a frequência de cada dezena inicial (dezenas 0-5) em todo o histórico.
-     */
     private Map<String, Long> calcularFrequenciaDigitoInicial(List<MegasenaResultado> historico) {
         
         Map<String, Long> frequencia = historico.stream()
@@ -169,10 +220,10 @@ public class MegaSenaService {
                 .map(dezena -> {
                     try {
                         int num = Integer.parseInt(dezena.trim());
-                        // 01-09 -> "0", 10-19 -> "1", ..., 50-59 -> "5"
                         if (num == 60) return "5"; 
                         return String.valueOf(num / 10);
                     } catch (NumberFormatException e) {
+                        log.error("Erro de formatação de dígito inicial.");
                         return null; 
                     }
                 })
@@ -199,9 +250,6 @@ public class MegaSenaService {
     
     // --- MÉTODOS AUXILIARES PARA ANÁLISE DE QUADRANTES/SETORES (3) ---
 
-    /**
-     * Calcula a média de números sorteados em cada quadrante (01-15, 16-30, 31-45, 46-60).
-     */
     private Map<String, Double> calcularMediaDistribuicaoSetores(List<MegasenaResultado> historico) {
 
         Map<String, Integer> limitesQuadrantes = new LinkedHashMap<>();
@@ -242,6 +290,10 @@ public class MegaSenaService {
                 }
             }
         }
+        
+        if (totalConcursos == 0) {
+            log.warn("Cálculo de distribuição de setores não pôde ser realizado: 0 concursos.");
+        }
 
         Map<String, Double> mediaDistribuicao = new LinkedHashMap<>();
         if (totalConcursos > 0) {
@@ -261,9 +313,10 @@ public class MegaSenaService {
      */
     private Double calcularDesvioPadraoSoma(List<Double> somas, Double media) {
         if (somas == null || somas.isEmpty() || media == null) {
+            log.warn("Cálculo de Desvio Padrão não pôde ser realizado: dados nulos/vazios.");
             return 0.0;
         }
-
+        // ... (resto da lógica)
         double somaDiferencasQuadradas = somas.stream()
                 .mapToDouble(soma -> Math.pow(soma - media, 2))
                 .sum();
@@ -276,7 +329,7 @@ public class MegaSenaService {
 
         IntStream.rangeClosed(1, 60)
             .forEach(i -> {
-                String dezena = String.format("%02d", i);
+                String dezena = formatarDezena(i);
 
                 Optional<MegasenaResultado> ultimoSorteioDezena = historico.stream()
                         .filter(c -> c.getDezenasAsList().contains(dezena))
@@ -286,6 +339,7 @@ public class MegaSenaService {
                 if (ultimoSorteioDezena.isPresent()) {
                     concursosDeAtraso = ultimoNumConcurso - ultimoSorteioDezena.get().getConcurso();
                 } else {
+                    log.debug("Dezena {} nunca foi sorteada. Atraso total: {}", dezena, ultimoNumConcurso);
                     concursosDeAtraso = ultimoNumConcurso; 
                 }
                 atraso.put(dezena, concursosDeAtraso);
@@ -360,18 +414,6 @@ public class MegaSenaService {
             }
         }
         return frequenciaQuadras;
-    }
-
-    private Map<String, Long> filtrarTopN(Map<String, Long> map, int limit) {
-        return map.entrySet().stream()
-                .sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-                .limit(limit)
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        Map.Entry::getValue,
-                        (e1, e2) -> e1, 
-                        LinkedHashMap::new
-                ));
     }
 
     private String formatarDezena(Integer dezena) {

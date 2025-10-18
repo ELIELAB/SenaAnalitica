@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sena Analítica - Estratégia Inteligente</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="container mt-4">
+        
+        <header class="jumbotron text-center">
+            <h1 class="display-4">Sena Analítica: Gerador de Apostas Inteligente</h1>
+            <p class="lead">Baseado em análises de frequência, atraso, ciclos e equilíbrio estatístico.</p>
+            <p id="info-geral">Carregando dados...</p>
+        </header>
+
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-lg border-success">
+                    <div class="card-header bg-success text-white text-center">
+                        <h4 class="mb-0">✨ RECOMENDAÇÕES DE APOSTA INTELIGENTE (3 ABORDAGENS) ✨</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+
+                            <div class="col-md-4 border-end">
+                                <h6 class="text-center text-danger">1. Estratégia do Ciclo Crítico (NASA)</h6>
+                                <p class="small text-muted text-center">Máxima chance de quebra de ciclo, priorizando o CMR mais alto.</p>
+                                <div id="aposta-critico" class="d-flex justify-content-center gap-2 mb-2">
+                                    <span class="spinner-border text-danger" role="status" style="width: 1.5rem; height: 1.5rem;"></span>
+                                </div>
+                                <small class="text-muted" id="estrategia-critico"></small>
+                            </div>
+
+                            <div class="col-md-4 border-end">
+                                <h6 class="text-center text-warning">2. Estratégia da Frequência Pura (Quente)</h6>
+                                <p class="small text-muted text-center">Foca nas dezenas mais sorteadas e pares/trincas mais comuns.</p>
+                                <div id="aposta-quente" class="d-flex justify-content-center gap-2 mb-2">
+                                    <span class="spinner-border text-warning" role="status" style="width: 1.5rem; height: 1.5rem;"></span>
+                                </div>
+                                <small class="text-muted" id="estrategia-quente"></small>
+                            </div>
+
+                            <div class="col-md-4">
+                                <h6 class="text-center text-primary">3. Estratégia Mista (Equilíbrio Total)</h6>
+                                <p class="small text-muted text-center">Combina frios e quentes, com foco na Soma e Distribuição Ideal.</p>
+                                <div id="aposta-mista" class="d-flex justify-content-center gap-2 mb-2">
+                                    <span class="spinner-border text-primary" role="status" style="width: 1.5rem; height: 1.5rem;"></span>
+                                </div>
+                                <small class="text-muted" id="estrategia-mista"></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-4">
+            
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header card-header-mega">
+                        Soma Ideal
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-1">A maioria dos sorteios tem a soma das 6 dezenas entre:</p>
+                        <h4 id="soma-ideal" class="highlight-green">--</h4>
+                        <p class="text-muted small">Média histórica: <span id="soma-media">--</span> (DP: <span id="soma-dp">--</span>)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header card-header-mega">
+                        Distribuição por Quadrante (1-15, 16-30, etc.)
+                    </div>
+                    <ul class="list-group list-group-flush" id="distribuicao-quadrante">
+                        <li class="list-group-item list-group-item-custom"><span>1-15</span><span class="highlight-green">--</span></li>
+                        <li class="list-group-item list-group-item-custom"><span>16-30</span><span class="highlight-green">--</span></li>
+                        <li class="list-group-item list-group-item-custom"><span>31-45</span><span class="highlight-green">--</span></li>
+                        <li class="list-group-item list-group-item-custom"><span>46-60</span><span class="highlight-green">--</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow-sm">
+                    <div class="card-header card-header-mega">
+                        Regras de Equilíbrio (Início/Fim)
+                    </div>
+                    <div class="card-body">
+                        <p>Para uma aposta equilibrada, evite:</p>
+                        <ul class="list-unstyled small">
+                            <li><span class="highlight-red">Mais de 2 números</span> com o mesmo **Dígito Final** (Ex: 05, 15, 25)</li>
+                            <li><span class="highlight-red">Mais de 3 números</span> na mesma **Dezena Inicial** (Ex: 30, 32, 35, 39)</li>
+                        </ul>
+                        <p class="text-muted small">Aposta ideal: 1 ou 2 números por Quadrante, 1 número por Dezena Inicial.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Análise de Equilíbrio de Dígitos (Fim e Início)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Frequência por Dígito FINAL (0 a 9)</h6>
+                                <p class="text-muted small" id="media-digito-final"></p>
+                                <div id="frequencia-digito-final" class="bar-container">
+                                    </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Frequência por Dígito INICIAL (Dezena)</h6>
+                                <p class="text-muted small">Compare com a média esperada para cada dezena.</p>
+                                <div id="frequencia-digito-inicial" class="bar-container">
+                                    </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+
+            <div class="col-md-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Atraso e Criticidade (Ciclos de Recorrência)</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted">Atraso: tempo sem sair. **CMR**: ciclo médio histórico. **CMR em vermelho** indica atraso *anormal* (maior que o histórico).</p>
+                        
+                        <div class="list-group" id="tabela-frequencia-atraso">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">Pares e Trincas Mais Sorteadas</h5>
+                    </div>
+                    <div class="card-body">
+                         <p class="text-muted">A inclusão de **pares** e **trincas** históricas aumenta as chances de acertar múltiplos números.</p>
+                        
+                        <h6 class="mt-3">Top 10 Pares:</h6>
+                        <ul class="list-group list-group-flush small" id="top-pares">
+                            </ul>
+
+                        <h6 class="mt-3">Top 5 Trincas:</h6>
+                        <ul class="list-group list-group-flush small" id="top-trincas">
+                            </ul>
+                    </div>
+                </div>
+            </div>
+
+        </div> </div> <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+
+</body>
+</html>

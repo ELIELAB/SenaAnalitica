@@ -1,0 +1,85 @@
+/* Cor de fundo padrão */
+body {
+    background-color: #f8f9fa;
+}
+
+/* Estilo para a seção Jumbotron/Header */
+.jumbotron {
+    background-color: #007bff;
+    color: white;
+    padding: 2rem 1rem;
+    margin-bottom: 2rem;
+    border-radius: .3rem;
+}
+
+/* Cor de fundo para cabeçalhos de cards principais */
+.card-header-mega {
+    background-color: #28a745; /* Verde Mega Sena */
+    color: white;
+    font-weight: bold;
+}
+
+/* Estilos de destaque para informações da API */
+.data-label {
+    font-weight: bold;
+    color: #007bff;
+}
+
+/* Destaque de risco (vermelho) */
+.highlight-red {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+/* Destaque de acerto (verde) */
+.highlight-green {
+    color: #28aa2f;
+    font-weight: bold;
+}
+
+/* Layout para itens de lista (separar label e valor) */
+.list-group-item-custom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Badge de números nas tabelas */
+.badge-numero {
+    font-size: 1rem;
+    padding: .5em .7em;
+    width: 35px;
+    text-align: center;
+}
+
+/* --- Estilos para o Gráfico de Barras (Fim/Início) --- */
+
+.bar-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.bar-item {
+    display: flex;
+    align-items: center;
+    font-size: 0.8rem;
+}
+
+.bar-label {
+    width: 70px; /* Largura fixa para rótulo */
+    font-weight: bold;
+    text-align: right;
+    padding-right: 5px;
+}
+
+.bar-fill {
+    height: 15px;
+    color: white;
+    text-align: right;
+    padding-right: 5px;
+    line-height: 15px;
+    border-radius: 3px;
+    white-space: nowrap; /* Impede que o texto quebre */
+    overflow: hidden;    /* Esconde o texto que ultrapassa a barra */
+}

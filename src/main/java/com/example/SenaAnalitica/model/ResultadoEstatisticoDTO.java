@@ -24,24 +24,27 @@ public class ResultadoEstatisticoDTO {
     // B. Média Aritmética Teórica
     private Double mediaDezenas; 
     
-    // C.1 Frequência de Trincas (NOVO)
-    private Map<String, Long> frequenciaTrincas; // Key ex: "05-10-15"
+    // C.1 Frequência de Trincas 
+    private Map<String, Long> frequenciaTrincas; 
     
-    // C.2 Frequência de Quadras (NOVO)
-    private Map<String, Long> frequenciaQuadras; // Key ex: "05-10-15-20"
+    // C.2 Frequência de Quadras 
+    private Map<String, Long> frequenciaQuadras; 
 
-    // NOVO: Média real da soma de todas as 6 dezenas
+    // Média real da soma de todas as 6 dezenas
     private Double somaMediaSorteio; 
 
-    // NOVO: Desvio Padrão da soma de todas as 6 dezenas
+    // Desvio Padrão da soma de todas as 6 dezenas
     private Double desvioPadraoSoma;
 
-    // NOVO (3): Média de números por quadrante (01-15, 16-30, etc.)
+    // (3): Média de números por quadrante 
     private Map<String, Double> mediaDistribuicaoSetores;
-
-    // NOVO (4.1): Frequência de cada dígito final (0 a 9)
-    private Map<String, Long> frequenciaDigitoFinal; // Key ex: "0", "1", ..., "9"
     
-    // NOVO (4.2): Frequência de cada dezena inicial (0 a 5)
-    private Map<String, Long> frequenciaDigitoInicial; // Key ex: "0" (01-09), "1" (10-19), ..., "5" (50-59)
+    // (4.1): Frequência de cada dígito final (0 a 9)
+    private Map<String, Long> frequenciaDigitoFinal; 
+    
+    // (4.2): Frequência de cada dezena inicial (0 a 5)
+    private Map<String, Long> frequenciaDigitoInicial; 
+
+    // (5): Ciclo Médio de Recorrência (CMR) por dezena
+    private Map<String, Double> cicloMedioRecorrencia; // Key ex: "43", Value ex: 20.4
 }
