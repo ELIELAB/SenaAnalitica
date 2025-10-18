@@ -2,12 +2,15 @@ package com.example.SenaAnalitica.service;
 
 
 
+
 import com.example.SenaAnalitica.model.MegasenaResultado;
 import com.example.SenaAnalitica.repository.MegasenaResultadoRepository;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.EventListener; // NOVO IMPORT
+import org.springframework.boot.context.event.ApplicationReadyEvent; // NOVO IMPORT
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -44,6 +47,16 @@ public class SincronizacaoService {
         private List<String> dezenas; 
     }
 
+    /**
+     * Executa a sincronização assim que a aplicação estiver completamente pronta.
+     * Esta substitui a necessidade do Scheduler agendado.
+     */
+    @EventListener(ApplicationReadyEvent.class) // Garante que roda no startup
+    public void sincronizarAoIniciar() {
+        verificarEAtualizar();
+    }
+
+
     public int verificarEAtualizar() {
         log.info("Iniciando a verificação e atualização da Mega-Sena...");
         int novosConcursos = 0;
@@ -79,7 +92,7 @@ public class SincronizacaoService {
                     resultado.setConcurso(dto.getConcurso());
                     resultado.setAcumulou(dto.getAcumulou());
                     resultado.setCidadeSorteio(dto.getCidade()); 
-                    resultado.setDataSorteio(dto.getData()); // Usa o setter adaptado na Entidade
+                    resultado.setDataSorteio(dto.getData()); 
                     resultado.setLocalSorteio(dto.getLocal()); 
                     resultado.setValorAcumulado(dto.getValorAcumulado());
                     resultado.setDezenasSorteadas(dto.getDezenas() != null ? String.join(",", dto.getDezenas()) : null);
