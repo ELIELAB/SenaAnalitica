@@ -23,4 +23,10 @@ public class ResultadoEstatisticoDTO {
     
     // B. Média Aritmética Teórica
     private Double mediaDezenas; 
+    
+    // C.1 Frequência de Trincas (NOVO)
+    private Map<String, Long> frequenciaTrincas; // Key ex: "05-10-15"
+    
+    // C.2 Frequência de Quadras (NOVO)
+    private Map<String, Long> frequenciaQuadras; // Key ex: "05-10-15-20"
 }
