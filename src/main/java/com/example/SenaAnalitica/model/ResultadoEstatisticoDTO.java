@@ -38,4 +38,10 @@ public class ResultadoEstatisticoDTO {
 
     // NOVO (3): Média de números por quadrante (01-15, 16-30, etc.)
     private Map<String, Double> mediaDistribuicaoSetores;
+
+    // NOVO (4.1): Frequência de cada dígito final (0 a 9)
+    private Map<String, Long> frequenciaDigitoFinal; // Key ex: "0", "1", ..., "9"
+    
+    // NOVO (4.2): Frequência de cada dezena inicial (0 a 5)
+    private Map<String, Long> frequenciaDigitoInicial; // Key ex: "0" (01-09), "1" (10-19), ..., "5" (50-59)
 }

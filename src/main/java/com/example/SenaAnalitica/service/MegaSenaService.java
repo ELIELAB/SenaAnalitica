@@ -46,7 +46,9 @@ public class MegaSenaService {
                     .mediaDezenas(30.5)
                     .somaMediaSorteio(183.0) 
                     .desvioPadraoSoma(0.0)
-                    .mediaDistribuicaoSetores(Map.of()) // Adicionado para consistência
+                    .mediaDistribuicaoSetores(Map.of())
+                    .frequenciaDigitoFinal(Map.of())
+                    .frequenciaDigitoInicial(Map.of())
                     .build();
         }
 
@@ -102,10 +104,14 @@ public class MegaSenaService {
         Map<String, Long> rawFrequenciaQuadras = calcularFrequenciaQuadras(historico);
         Map<String, Long> topQuadras = filtrarTopN(rawFrequenciaQuadras, 100);
 
-        // --- 3. CÁLCULO DA DISTRIBUIÇÃO DE SETORES (NOVO) ---
+        // --- 3. CÁLCULO DA DISTRIBUIÇÃO DE SETORES ---
         Map<String, Double> mediaDistribuicaoSetores = calcularMediaDistribuicaoSetores(historico);
+        
+        // --- 4. CÁLCULO DE FIM E INÍCIO (NOVO) ---
+        Map<String, Long> frequenciaDigitoFinal = calcularFrequenciaDigitoFinal(historico);
+        Map<String, Long> frequenciaDigitoInicial = calcularFrequenciaDigitoInicial(historico);
 
-        // --- 4. MONTA E RETORNA O DTO ---
+        // --- 5. MONTA E RETORNA O DTO ---
         return ResultadoEstatisticoDTO.builder()
                 .totalConcursosAnalisados(historico.size())
                 .ultimoSorteio(ultimoSorteioDate) 
@@ -115,36 +121,100 @@ public class MegaSenaService {
                 .frequenciaTrincas(topTrincas) 
                 .frequenciaQuadras(topQuadras) 
                 .mediaDezenas(30.5) // Média Aritmética Teórica (constante)
-                .somaMediaSorteio(somaMedia) // NOVO
-                .desvioPadraoSoma(desvioPadrao) // NOVO
-                .mediaDistribuicaoSetores(mediaDistribuicaoSetores) // ADICIONADO AQUI
+                .somaMediaSorteio(somaMedia) 
+                .desvioPadraoSoma(desvioPadrao) 
+                .mediaDistribuicaoSetores(mediaDistribuicaoSetores)
+                .frequenciaDigitoFinal(frequenciaDigitoFinal) 
+                .frequenciaDigitoInicial(frequenciaDigitoInicial) 
                 .build();
     }
+    
+    // --- MÉTODOS AUXILIARES PARA ANÁLISE DE FIM E INÍCIO (4) ---
 
-    // --- NOVO MÉTODO PARA ANÁLISE DE QUADRANTES/SETORES (3) ---
+    /**
+     * Calcula a frequência de cada dígito final (0 a 9) em todo o histórico.
+     */
+    private Map<String, Long> calcularFrequenciaDigitoFinal(List<MegasenaResultado> historico) {
+        
+        Map<String, Long> frequencia = historico.stream()
+                .flatMap(c -> c.getDezenasAsList().stream())
+                .map(dezena -> dezena.substring(dezena.length() - 1))
+                .collect(Collectors.groupingBy(
+                        digito -> digito, 
+                        Collectors.counting()
+                ));
+        
+        IntStream.rangeClosed(0, 9).forEach(i -> {
+            String digito = String.valueOf(i);
+            frequencia.putIfAbsent(digito, 0L);
+        });
+
+        return frequencia.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey, 
+                        Map.Entry::getValue, 
+                        (e1, e2) -> e1, 
+                        LinkedHashMap::new
+                ));
+    }
+
+    /**
+     * Calcula a frequência de cada dezena inicial (dezenas 0-5) em todo o histórico.
+     */
+    private Map<String, Long> calcularFrequenciaDigitoInicial(List<MegasenaResultado> historico) {
+        
+        Map<String, Long> frequencia = historico.stream()
+                .flatMap(c -> c.getDezenasAsList().stream())
+                .map(dezena -> {
+                    try {
+                        int num = Integer.parseInt(dezena.trim());
+                        // 01-09 -> "0", 10-19 -> "1", ..., 50-59 -> "5"
+                        if (num == 60) return "5"; 
+                        return String.valueOf(num / 10);
+                    } catch (NumberFormatException e) {
+                        return null; 
+                    }
+                })
+                .filter(prefixo -> prefixo != null && prefixo.matches("[0-5]")) 
+                .collect(Collectors.groupingBy(
+                        prefixo -> prefixo, 
+                        Collectors.counting()
+                ));
+        
+        IntStream.rangeClosed(0, 5).forEach(i -> {
+            String prefixo = String.valueOf(i);
+            frequencia.putIfAbsent(prefixo, 0L);
+        });
+        
+        return frequencia.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey, 
+                        Map.Entry::getValue, 
+                        (e1, e2) -> e1, 
+                        LinkedHashMap::new
+                ));
+    }
+    
+    // --- MÉTODOS AUXILIARES PARA ANÁLISE DE QUADRANTES/SETORES (3) ---
 
     /**
      * Calcula a média de números sorteados em cada quadrante (01-15, 16-30, 31-45, 46-60).
-     * @param historico Lista de todos os resultados da Mega Sena.
-     * @return Um mapa com a chave sendo o setor e o valor a média de dezenas sorteadas.
      */
     private Map<String, Double> calcularMediaDistribuicaoSetores(List<MegasenaResultado> historico) {
 
-        // Definição dos quadrantes: Key=Nome, Value=Limite superior
         Map<String, Integer> limitesQuadrantes = new LinkedHashMap<>();
         limitesQuadrantes.put("1-15", 15);
         limitesQuadrantes.put("16-30", 30);
         limitesQuadrantes.put("31-45", 45);
         limitesQuadrantes.put("46-60", 60);
 
-        // Mapa para armazenar o TOTAL de ocorrências por setor em TODO o histórico
         Map<String, Long> contagemTotalPorSetor = new HashMap<>();
         limitesQuadrantes.keySet().forEach(key -> contagemTotalPorSetor.put(key, 0L));
 
-        // Total de concursos para cálculo da média
         int totalConcursos = historico.size();
 
-        // Itera sobre CADA concurso
         for (MegasenaResultado resultado : historico) {
             List<Integer> dezenas = resultado.getDezenasAsList().stream()
                     .map(s -> {
@@ -153,14 +223,11 @@ public class MegaSenaService {
                     .filter(d -> d >= 1 && d <= 60)
                     .collect(Collectors.toList());
 
-            // Itera sobre CADA dezena do sorteio e a aloca em seu setor
             for (Integer dezena : dezenas) {
-
+                
                 String setor = null;
 
-                // Encontra o setor da dezena
                 for (Map.Entry<String, Integer> entry : limitesQuadrantes.entrySet()) {
-                    // O limite inferior é calculado subtraindo 14 do limite superior (15-14=1, 30-14=16, etc.)
                     int limiteInferior = entry.getValue() - 14; 
                     int limiteSuperior = entry.getValue();
 
@@ -170,19 +237,16 @@ public class MegaSenaService {
                     }
                 }
 
-                // Incrementa a contagem para o setor encontrado
                 if (setor != null) {
                     contagemTotalPorSetor.merge(setor, 1L, Long::sum);
                 }
             }
         }
 
-        // Calcula a média: (Total de ocorrências no setor) / (Total de concursos)
         Map<String, Double> mediaDistribuicao = new LinkedHashMap<>();
         if (totalConcursos > 0) {
             contagemTotalPorSetor.forEach((setor, totalOcorrencias) -> {
                 double media = (double) totalOcorrencias / totalConcursos;
-                // Formata com 2 casas decimais para o DTO
                 mediaDistribuicao.put(setor, Math.round(media * 100.0) / 100.0);
             });
         }
@@ -190,13 +254,10 @@ public class MegaSenaService {
         return mediaDistribuicao;
     }
 
-    // --- NOVO MÉTODO AUXILIAR PARA DESVIO PADRÃO (existente) ---
-
+    // --- MÉTODOS AUXILIARES DE LÓGICA EXISTENTE ---
+    
     /**
      * Calcula o Desvio Padrão de uma lista de somas.
-     * @param somas Lista das somas de todas as dezenas por sorteio.
-     * @param media Média aritmética dessas somas.
-     * @return O Desvio Padrão da Soma.
      */
     private Double calcularDesvioPadraoSoma(List<Double> somas, Double media) {
         if (somas == null || somas.isEmpty() || media == null) {
@@ -207,11 +268,8 @@ public class MegaSenaService {
                 .mapToDouble(soma -> Math.pow(soma - media, 2))
                 .sum();
 
-        // Fórmula do Desvio Padrão Populacional
         return Math.sqrt(somaDiferencasQuadradas / somas.size());
     }
-
-    // --- Métodos Auxiliares de Lógica Existente ---
 
     private Map<String, Integer> calcularAtraso(List<MegasenaResultado> historico, Integer ultimoNumConcurso) {
         Map<String, Integer> atraso = new HashMap<>();
